@@ -4,8 +4,11 @@ import logging
 import re
 import base64
 import random
+import json
+import os
 from io import BytesIO
 from PIL import Image
+from datetime import datetime, timedelta
 
 from selenium import webdriver
 from selenium.webdriver import ActionChains
@@ -69,6 +72,77 @@ class LoginHelper:
 
         # 初始化浏览器驱动
         self.driver = self._init_driver()
+        self.login_info_file = "login_info.json"  # 定义存储登录信息的文件名
+        self.login_info = self.load_login_info()
+        # 尝试使用已保存的登录信息
+        if self.login_info and self.is_login_info_valid():
+            logging.info("使用已保存的登录信息")
+            if self.resume_session():
+                logging.info("成功恢复会话")
+                return  # 如果会话恢复成功，则无需再次登录
+            else:
+                logging.warning("恢复会话失败，将重新登录")
+                self.login_info = None  # 清除无效的登录信息
+
+    def load_login_info(self):
+        """从文件加载登录信息"""
+        try:
+            logging.info("正在加载登录信息...")
+            with open(self.login_info_file, "r") as f:
+                return json.load(f)
+        except FileNotFoundError:
+            logging.info("未找到登录信息文件，将重新登录")
+            return None
+        except json.JSONDecodeError:
+            logging.warning("登录信息文件损坏，将重新登录")
+            return None
+
+    def save_login_info(self, login_info):
+        """将登录信息保存到文件"""
+        try:
+            # 打印 JSON 数据
+            print("即将保存的登录信息（JSON 格式）:", json.dumps(login_info, indent=4))
+            # 确保目录存在
+            os.makedirs(os.path.dirname(self.login_info_file), exist_ok=True)
+            
+            with open(self.login_info_file, "w") as f:
+                json.dump(login_info, f, indent=4)
+            logging.info(f"登录信息已保存: {login_info}")
+        except Exception as e:
+            logging.error(f"保存登录信息失败: {e}")
+            raise  # 可以考虑抛出异常让调用方处理
+
+    def is_login_info_valid(self):
+        """检查登录信息是否有效（例如，检查过期时间）"""
+        if self.login_info and "expiration_time" in self.login_info:
+            try:
+                logging.info("正在检查登录信息是否有效...")
+                expiration_time = datetime.fromisoformat(self.login_info["expiration_time"].replace("Z", "+00:00"))
+                return expiration_time > datetime.now()
+            except ValueError:
+                logging.warning("登录信息过期时间格式错误")
+                return False
+        return False
+
+    def resume_session(self):
+        """尝试使用已保存的Cookie恢复会话"""
+        if self.login_info and "cookies" in self.login_info:
+            try:
+                for cookie in self.login_info["cookies"]:
+                    if 'expiry' in cookie:
+                        cookie['expiry'] = int(cookie['expiry']) # selenium 需要int类型
+                    self.driver.add_cookie(cookie)
+                self.driver.refresh()  # 刷新页面以应用Cookie
+                current_url = self.driver.current_url
+                if LOGIN_URL not in current_url:
+                    logging.info("成功恢复会话")
+                    return True
+                else:
+                    logging.warning("恢复会话失败，需要重新登录")
+                    return False
+            except Exception as e:
+                logging.error(f"恢复会话失败: {e}")
+                return False
 
     def _init_driver(self):
         """初始化浏览器驱动"""
@@ -335,6 +409,18 @@ class LoginHelper:
         except Exception as e:
             logging.error(f"登录过程中发生严重错误: {str(e)}")
             return False
+    
+    def wrapped_login(self):
+        """包裹 login 方法，实现登录成功后保存 Cookies"""
+        if self.login():
+            login_data = {
+                "cookies": self.driver.get_cookies(),
+                "expiration_time": str(datetime.now() + timedelta(days=1))
+            }
+            self.save_login_info(login_data)
+            return True
+        else:
+            return False
 
     def close(self):
         """关闭浏览器"""
@@ -348,7 +434,7 @@ if __name__ == "__main__":
     try:
         logging.info("开始执行登录测试...")
         helper = LoginHelper()
-        if helper.login(): # 移除 phone_code 参数调用
+        if helper.wrapped_login():
             print("登录操作执行完毕，结果：成功")
         else:
             print("登录操作执行完毕，结果：失败")
