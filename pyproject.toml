@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "python-cli-starter"
+name = "sgcc-electricity-feishu"
 dynamic = ["version"]
-description = "Python CLI Starter Template"
+description = "国家电网飞书应用开发"
 readme = "README.md"
 requires-python = "<3.13"
 license = "MIT"
@@ -26,6 +26,13 @@ dependencies = [
   "typer>=0.9.0",
   "rich>=13.0.0",
   "python-dotenv>=1.1.0",
+  "selenium>=4.31.0",
+  "requests>=2.32.3",
+  "schedule>=1.2.2",
+  "Pillow>=11.1.0",
+  "undetected-chromedriver>=3.5.5",
+  "onnxruntime>=1.21.0",
+  "numpy>=2.2.4",
 ]
 
 [project.optional-dependencies]
@@ -37,11 +44,11 @@ build = [
 ]
 
 [project.scripts]
-cli = "python_cli_starter.main:app"
+cli = "sgcc_electricity_feishu.main:app"
 
 # Hatchling 特定配置
 [tool.hatch.version]
-path = "src/python_cli_starter/__init__.py"
+path = "src/sgcc_electricity_feishu/__init__.py"
 
 # 添加 hatch 包配置
 [tool.hatch.packages.find]

@@ -1,6 +1,6 @@
-# Python CLI 项目模板
+# 国家电网飞书应用
 
-一个使用 Typer 和 Rich 的最小化 Python 命令行应用模板。
+国家电网飞书应用开发
 
 ## 功能特性
 
@@ -39,7 +39,7 @@ pytest
 
 ```
 src/
-  python_cli_starter/
+  sgcc_electricity_feishu/
     __init__.py    # 包初始化文件
     cli.py         # CLI 命令定义
     main.py        # 应用入口

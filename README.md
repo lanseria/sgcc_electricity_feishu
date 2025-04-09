@@ -1,6 +1,6 @@
-# Python CLI Starter Template
+# sgcc_electricity_feishu
 
-A minimal Python command-line application template using Typer and Rich.
+国家电网飞书应用开发
 
 ## Features
 
@@ -39,7 +39,7 @@ pytest
 
 ```
 src/
-  python_cli_starter/
+  sgcc_electricity_feishu/
     __init__.py    # Package initialization
     cli.py         # CLI commands
     main.py        # App entry point

@@ -3,8 +3,10 @@
     "bboxes",
     "dify",
     "dotenv",
+    "feishu",
     "genai",
     "imdecode",
-    "imwrite"
+    "imwrite",
+    "sgcc"
   ]
 }
