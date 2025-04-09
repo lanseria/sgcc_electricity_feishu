@@ -427,24 +427,3 @@ class LoginHelper:
         if self.driver:
             self.driver.quit()
             logging.info("浏览器已关闭")
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-    helper = None
-    try:
-        logging.info("开始执行登录测试...")
-        helper = LoginHelper()
-        if helper.wrapped_login():
-            print("登录操作执行完毕，结果：成功")
-        else:
-            print("登录操作执行完毕，结果：失败")
-    except ValueError as ve:
-         print(f"配置错误: {ve}")
-    except Exception as e:
-         print(f"执行过程中发生未处理的异常: {e}")
-         logging.exception("未处理异常详情:")
-    finally:
-        if helper:
-            logging.info("关闭浏览器...")
-            helper.close()
-        logging.info("登录测试执行结束。")

@@ -54,5 +54,7 @@ MIT
 ## 特别说明
 
 本项目代码参考自 [https://github.com/ARC-MX/sgcc_electricity_new](https://github.com/ARC-MX/sgcc_electricity_new)。
-
+如果遇到网络连接超时（RK001），请重试！
 国网每天有登录限制，每天只能登录有限的几次，超过限制验证码识别成功也不会登录成功。
+
+
