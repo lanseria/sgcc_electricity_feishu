@@ -25,7 +25,9 @@ pip install -e .
 ## Usage
 
 ```bash
-cli hello [name]
+sef hello [name]
+sef sgcc-login
+sef bitable-list
 ```
 
 ## Development
