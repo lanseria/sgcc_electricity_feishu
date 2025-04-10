@@ -5,7 +5,6 @@ import re
 import base64
 import random
 import json
-import os
 from io import BytesIO
 from PIL import Image
 from datetime import datetime, timedelta
@@ -19,6 +18,7 @@ from selenium.webdriver.chrome.service import Service
 from dotenv import load_dotenv
 
 # 假设 const.py 和 onnx.py 在同一目录下或已正确配置路径
+from .electricity_data import ElectricityDataFetcher
 from .const import LOGIN_URL, LOGIN_INFO_FILE
 from .onnx import ONNX # 导入ONNX类
 # 配置日志格式
@@ -492,63 +492,9 @@ class LoginHelper:
             except:
                 logging.warning("未找到指定按钮，可能已自动展开")
             
-            # 点击"日用电量"按钮
-            try:
-                daily_button = self.driver.find_element(
-                    By.XPATH, '//div[contains(text(), "日用电量")]')
-                daily_button.click()
-                time.sleep(3)  # 等待数据加载
-            except Exception as e:
-                logging.error(f"点击日用电量按钮失败: {e}")
-                raise
-            
-            # 执行JS脚本获取数据
-            js_script = """
-            // 获取tbody元素
-            const tbody = document.querySelector('#pane-second > div:nth-child(2) > div.about > div.el-table.about-table.trcen.el-table--fit.el-table--enable-row-hover.el-table--enable-row-transition > div.el-table__body-wrapper.is-scrolling-none > table > tbody');
-            if (!tbody) return [];
-            
-            const trList = tbody.querySelectorAll('tr');
-            const result = [];
-            
-            async function getData(tr, index) {
-                const date = tr.querySelector('td:nth-child(1) div')?.innerText.trim() || '';
-                const reading = tr.querySelector('td:nth-child(2) div')?.innerText.trim() || '';
-                
-                const thirdTd = tr.querySelector('td:nth-child(3) div div');
-                if (!thirdTd) return {date, reading, highNum: '0', lowNum: '0'};
-                
-                // 模拟点击
-                thirdTd.click();
-                await new Promise(resolve => setTimeout(resolve, 100));
-                
-                const targetTr = tbody.querySelector('tr.el-table__row.expanded');
-                if (!targetTr) return {date, reading, highNum: '0', lowNum: '0'};
-                
-                const nextTr = targetTr.nextElementSibling;
-                if (!nextTr) return {date, reading, highNum: '0', lowNum: '0'};
-                
-                const pList = nextTr.querySelector('td > div > div.drop-box-left');
-                if (!pList) return {date, reading, highNum: '0', lowNum: '0'};
-                
-                const lowNum = pList.querySelector('p:nth-child(1) span.num')?.innerText.trim() || '0';
-                const highNum = pList.querySelector('p:nth-child(3) span.num')?.innerText.trim() || '0';
-                
-                return {date, reading, highNum, lowNum};
-            }
-            
-            // 逐个处理每行数据
-            for (let i = 0; i < trList.length; i++) {
-                const data = await getData(trList[i], i);
-                result.push(data);
-            }
-            
-            return result;
-            """
-            
-            # 执行JS并获取结果
-            data = self.driver.execute_script(js_script)
-            logging.info(f"成功获取用电数据: {json.dumps(data, indent=2, ensure_ascii=False)}")
+            # 使用ElectricityDataFetcher获取用电数据
+            data_fetcher = ElectricityDataFetcher(self.driver)
+            data = data_fetcher.get_daily_electricity_data()
             return data
             
         except Exception as e:
