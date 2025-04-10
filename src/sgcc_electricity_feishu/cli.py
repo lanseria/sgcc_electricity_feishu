@@ -70,6 +70,21 @@ def bitable_update():
     except Exception as e:
         console.print(f"[bold red]获取多维表格应用失败: {e}[/bold red]")
 
-
+@app.command()
+def main():
+    # sgcc_helper = LoginHelper()
+    feishu_helper = FeishuBitableHelper()
+    feishu_data = feishu_helper.list_records(view_id="veweYY5B8i", 
+        field_names=["日期", "家用峰电度数", "家用谷电度数", "充电桩峰电度数", "充电桩谷电度数"], 
+        sort=[{"field_name": "日期", "desc": True}]
+    )
+    console.print(feishu_data)
+    # sgcc_data = sgcc_helper.fetch_data()
+    # if (sgcc_data):
+    #     console.print("[bold green]登录成功[/bold green]")
+    #     if (feishu_data):
+    #         console.print('TODO')
+    # else:
+    #     console.print("[bold red]登录失败[/bold red]")
 if __name__ == "__main__":
     app()

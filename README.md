@@ -28,6 +28,7 @@ pip install -e .
 sef hello [name]
 sef sgcc-login
 sef bitable-list
+sef main
 ```
 
 ## Development
