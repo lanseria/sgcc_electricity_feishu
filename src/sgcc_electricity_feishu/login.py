@@ -19,7 +19,7 @@ from selenium.webdriver.chrome.service import Service
 from dotenv import load_dotenv
 
 # 假设 const.py 和 onnx.py 在同一目录下或已正确配置路径
-from .const import LOGIN_URL
+from .const import LOGIN_URL, LOGIN_INFO_FILE
 from .onnx import ONNX # 导入ONNX类
 # 配置日志格式
 logging.basicConfig(
@@ -72,23 +72,14 @@ class LoginHelper:
 
         # 初始化浏览器驱动
         self.driver = self._init_driver()
-        self.login_info_file = "login_info.json"  # 定义存储登录信息的文件名
+        # 定义存储登录信息的文件路径（项目根目录下）
         self.login_info = self.load_login_info()
-        # 尝试使用已保存的登录信息
-        if self.login_info and self.is_login_info_valid():
-            logging.info("使用已保存的登录信息")
-            if self.resume_session():
-                logging.info("成功恢复会话")
-                return  # 如果会话恢复成功，则无需再次登录
-            else:
-                logging.warning("恢复会话失败，将重新登录")
-                self.login_info = None  # 清除无效的登录信息
 
     def load_login_info(self):
         """从文件加载登录信息"""
         try:
             logging.info("正在加载登录信息...")
-            with open(self.login_info_file, "r") as f:
+            with open(LOGIN_INFO_FILE, "r") as f:
                 return json.load(f)
         except FileNotFoundError:
             logging.info("未找到登录信息文件，将重新登录")
@@ -100,17 +91,32 @@ class LoginHelper:
     def save_login_info(self, login_info):
         """将登录信息保存到文件"""
         try:
+            # 尝试获取 localStorage 和 sessionStorage
+            try:
+                login_info["localStorage"] = self.driver.execute_script(
+                    "return Object.keys(localStorage).reduce((acc, key) => ({...acc, [key]: localStorage.getItem(key)}), {});"
+                )
+            except Exception as e:
+                logging.warning(f"获取localStorage失败: {e}")
+                login_info["localStorage"] = {}
+            
+            try:
+                login_info["sessionStorage"] = self.driver.execute_script(
+                    "return Object.keys(sessionStorage).reduce((acc, key) => ({...acc, [key]: sessionStorage.getItem(key)}), {});"
+                )
+            except Exception as e:
+                logging.warning(f"获取sessionStorage失败: {e}")
+                login_info["sessionStorage"] = {}
+            
             # 打印 JSON 数据
             print("即将保存的登录信息（JSON 格式）:", json.dumps(login_info, indent=4))
-            # 确保目录存在
-            os.makedirs(os.path.dirname(self.login_info_file), exist_ok=True)
             
-            with open(self.login_info_file, "w") as f:
+            with open(LOGIN_INFO_FILE, "w") as f:
                 json.dump(login_info, f, indent=4)
             logging.info(f"登录信息已保存: {login_info}")
         except Exception as e:
             logging.error(f"保存登录信息失败: {e}")
-            raise  # 可以考虑抛出异常让调用方处理
+            # 不再抛出异常，仅记录错误
 
     def is_login_info_valid(self):
         """检查登录信息是否有效（例如，检查过期时间）"""
@@ -125,24 +131,64 @@ class LoginHelper:
         return False
 
     def resume_session(self):
-        """尝试使用已保存的Cookie恢复会话"""
-        if self.login_info and "cookies" in self.login_info:
-            try:
+        """尝试使用已保存的Cookie和Storage恢复会话"""
+        if not self.login_info:
+            return False
+            
+        try:
+            # 先访问目标域名以设置cookie和storage
+            self.driver.get("https://www.95598.cn")
+            
+            # 恢复cookies
+            if "cookies" in self.login_info:
                 for cookie in self.login_info["cookies"]:
-                    if 'expiry' in cookie:
-                        cookie['expiry'] = int(cookie['expiry']) # selenium 需要int类型
-                    self.driver.add_cookie(cookie)
-                self.driver.refresh()  # 刷新页面以应用Cookie
-                current_url = self.driver.current_url
-                if LOGIN_URL not in current_url:
-                    logging.info("成功恢复会话")
-                    return True
-                else:
-                    logging.warning("恢复会话失败，需要重新登录")
-                    return False
-            except Exception as e:
-                logging.error(f"恢复会话失败: {e}")
+                    try:
+                        cookie_dict = {
+                            'name': cookie['name'],
+                            'value': cookie['value'],
+                            'domain': cookie.get('domain', 'www.95598.cn'),
+                            'path': cookie.get('path', '/'),
+                            'secure': cookie.get('secure', False),
+                            'httpOnly': cookie.get('httpOnly', False)
+                        }
+                        if 'expiry' in cookie:
+                            cookie_dict['expiry'] = int(cookie['expiry'])
+                        if 'sameSite' in cookie:
+                            cookie_dict['sameSite'] = cookie['sameSite']
+                        self.driver.add_cookie(cookie_dict)
+                    except Exception as e:
+                        logging.warning(f"添加cookie {cookie.get('name')} 失败: {e}")
+
+            # 恢复localStorage
+            if "localStorage" in self.login_info:
+                for key, value in self.login_info["localStorage"].items():
+                    try:
+                        self.driver.execute_script(f"window.localStorage.setItem('{key}', '{value}');")
+                    except Exception as e:
+                        logging.warning(f"恢复localStorage {key} 失败: {e}")
+
+            # 恢复sessionStorage
+            if "sessionStorage" in self.login_info:
+                for key, value in self.login_info["sessionStorage"].items():
+                    try:
+                        self.driver.execute_script(f"window.sessionStorage.setItem('{key}', '{value}');")
+                    except Exception as e:
+                        logging.warning(f"恢复sessionStorage {key} 失败: {e}")
+
+            # 跳转到目标页面验证登录状态
+            self.driver.get("https://www.95598.cn/osgweb/electricityCharge")
+            time.sleep(2)  # 等待页面加载
+            
+            # 检查是否在目标页面
+            if "electricityCharge" in self.driver.current_url:
+                logging.info("成功恢复会话并跳转到目标页面")
+                return True
+            else:
+                logging.warning("恢复会话失败，需要重新登录")
                 return False
+        except Exception as e:
+            logging.error(f"恢复会话失败: {e}")
+            return False
 
     def _init_driver(self):
         """初始化浏览器驱动"""
@@ -421,6 +467,93 @@ class LoginHelper:
             return True
         else:
             return False
+
+    def fetch_data(self):
+        """获取用电量数据"""
+        try:
+            # 尝试使用已保存的登录信息
+            if self.login_info and self.is_login_info_valid():
+                logging.info("使用已保存的登录信息")
+                if not self.resume_session():
+                    logging.warning("恢复会话失败，将重新登录")
+                    self.login_info = None
+                    self.wrapped_login()
+            
+            # 跳转到电费查询页面
+            self.driver.get("https://www.95598.cn/osgweb/electricityCharge")
+            time.sleep(3)  # 等待页面加载
+            
+            # 检查并点击指定按钮
+            try:
+                button = self.driver.find_element(
+                    By.XPATH, '//*[@id="app"]/div/div[2]/div/div/div/div[2]/div[2]/div/button')
+                button.click()
+                time.sleep(1)
+            except:
+                logging.warning("未找到指定按钮，可能已自动展开")
+            
+            # 点击"日用电量"按钮
+            try:
+                daily_button = self.driver.find_element(
+                    By.XPATH, '//div[contains(text(), "日用电量")]')
+                daily_button.click()
+                time.sleep(3)  # 等待数据加载
+            except Exception as e:
+                logging.error(f"点击日用电量按钮失败: {e}")
+                raise
+            
+            # 执行JS脚本获取数据
+            js_script = """
+            // 获取tbody元素
+            const tbody = document.querySelector('#pane-second > div:nth-child(2) > div.about > div.el-table.about-table.trcen.el-table--fit.el-table--enable-row-hover.el-table--enable-row-transition > div.el-table__body-wrapper.is-scrolling-none > table > tbody');
+            if (!tbody) return [];
+            
+            const trList = tbody.querySelectorAll('tr');
+            const result = [];
+            
+            async function getData(tr, index) {
+                const date = tr.querySelector('td:nth-child(1) div')?.innerText.trim() || '';
+                const reading = tr.querySelector('td:nth-child(2) div')?.innerText.trim() || '';
+                
+                const thirdTd = tr.querySelector('td:nth-child(3) div div');
+                if (!thirdTd) return {date, reading, highNum: '0', lowNum: '0'};
+                
+                // 模拟点击
+                thirdTd.click();
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                const targetTr = tbody.querySelector('tr.el-table__row.expanded');
+                if (!targetTr) return {date, reading, highNum: '0', lowNum: '0'};
+                
+                const nextTr = targetTr.nextElementSibling;
+                if (!nextTr) return {date, reading, highNum: '0', lowNum: '0'};
+                
+                const pList = nextTr.querySelector('td > div > div.drop-box-left');
+                if (!pList) return {date, reading, highNum: '0', lowNum: '0'};
+                
+                const lowNum = pList.querySelector('p:nth-child(1) span.num')?.innerText.trim() || '0';
+                const highNum = pList.querySelector('p:nth-child(3) span.num')?.innerText.trim() || '0';
+                
+                return {date, reading, highNum, lowNum};
+            }
+            
+            // 逐个处理每行数据
+            for (let i = 0; i < trList.length; i++) {
+                const data = await getData(trList[i], i);
+                result.push(data);
+            }
+            
+            return result;
+            """
+            
+            # 执行JS并获取结果
+            data = self.driver.execute_script(js_script)
+            logging.info(f"成功获取用电数据: {json.dumps(data, indent=2, ensure_ascii=False)}")
+            return data
+            
+        except Exception as e:
+            logging.error(f"获取用电数据失败: {e}")
+            raise
 
     def close(self):
         """关闭浏览器"""

@@ -26,7 +26,7 @@ def sgcc_login():
     console.print("开始执行登录...")
     try:
         helper = LoginHelper()
-        if helper.wrapped_login():
+        if helper.fetch_data():
             console.print("[bold green]登录成功[/bold green]")
         else:
             console.print("[bold red]登录失败[/bold red]")
