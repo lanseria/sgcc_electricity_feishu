@@ -1,33 +1,44 @@
 # sgcc_electricity_feishu
 
-国家电网飞书应用开发
+国家电网飞书应用多维表格数据抓取
 
 ## Features
 
-- Basic CLI structure with Typer
-- Rich console output
-- Python project configuration (pyproject.toml)
-- Test setup with pytest
+- 基于 Typer 的 CLI 命令行结构
+- 丰富的终端输出（Rich）
+- Python 项目配置（pyproject.toml）
+- pytest 测试用例支持
 
 ## Installation
 
+运行前请配置 `.env` 文件，可以从 `.env.example` 复制：
+
 ```bash
-# Create virtual environment
+cp .env.example .env
+```
+
+`.env` 文件需包含以下参数（需从飞书获取）：
+
+- 机器人 app id：`FEISHU_APP_ID=`
+- 机器人 app secret：`FEISHU_APP_SECRET=`
+- 表格 appToken：`BITABLE_APP_TOKEN=`
+- 表格ID：`BITABLE_TABLE_ID=`
+- 表格视图ID：`BITABLE_VIEW_ID=`
+
+```bash
+# 创建虚拟环境
 python3 -m venv myenv
 python3.12 -m venv myenv
 source myenv/bin/activate  # macOS/Linux
 # .\myenv\Scripts\Activate.ps1  # Windows
 
-# Install dependencies
+# 安装依赖
 pip install -e .
 ```
 
 ## Usage
 
 ```bash
-sef hello [name]
-sef sgcc-login
-sef bitable-list
 sef main
 ```
 
@@ -49,6 +60,14 @@ src/
 tests/             # Test cases
 pyproject.toml     # Project configuration
 ```
+
+## 资源链接
+
+飞书多维表格模板：[点击访问](https://enjqkboeqf.feishu.cn/base/O94YbicNVapkVdsuzgIcojx3nWh?from=from_copylink)
+
+验证码识别模型 captcha.onnx：请从 https://github.com/ARC-MX/sgcc_electricity_new 下载
+
+讲解视频：（待补充）
 
 ## License
 
