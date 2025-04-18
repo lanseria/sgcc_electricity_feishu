@@ -39,7 +39,7 @@ pip install -e .
 ## Usage
 
 ```bash
-sef main
+sef run-sync-job
 ```
 
 ## Development

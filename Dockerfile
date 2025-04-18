@@ -16,15 +16,17 @@ COPY ./src ./src
 COPY ./pyproject.toml ./
 COPY ./captcha.onnx ./
 COPY ./README.md ./
+COPY ./run_sef.sh /app/run_sef.sh
 
 # 安装构建工具（如有 C 扩展或依赖要求，可加 build-essential）
-RUN apt-get --allow-releaseinfo-change update \
-    && apt-get install -y --no-install-recommends jq chromium chromium-driver tzdata \
+RUN apt-get update && apt-get install -y --no-install-recommends cron jq chromium chromium-driver tzdata \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone \
     && dpkg-reconfigure --frontend noninteractive tzdata \
     && rm -rf /var/lib/apt/lists/*  \
     && apt-get clean
+
+RUN chmod +x /app/run_sef.sh
 
 # 建议先安装 pipx 以便用 PEP 517/518 构建
 RUN pip install --upgrade pip
@@ -32,8 +34,8 @@ RUN pip install --upgrade pip
 # 安装项目依赖（推荐使用 PEP 517/518 标准，支持 pyproject.toml）
 RUN pip install -e .
 
-# 暴露 CLI 命令（可选，如通过 ENTRYPOINT 直接运行 sef main）
-ENTRYPOINT ["sef", "main"]
+RUN echo "0 18 * * * root /app/run_sef.sh >> /var/log/cron.log 2>&1" > /etc/cron.d/sef_cron \
+    && chmod 0644 /etc/cron.d/sef_cron \
+    && touch /var/log/cron.log
 
-# 或者如需进入交互式 shell，可使用如下命令（注释上一行 ENTRYPOINT）
-# CMD ["/bin/bash"]
+ENTRYPOINT ["cron", "-f"]

@@ -2,6 +2,8 @@ import typer
 from typing import Optional
 from rich.console import Console
 from .login import LoginHelper
+import time
+from datetime import datetime, timedelta
 from .feishu_bitable import FeishuBitableHelper
 from .utils import fill_missing_data, get_sgcc_data_with_cache, update_filled_records_to_feishu, save_to_json
 
@@ -66,7 +68,7 @@ def bitable_update():
         console.print(f"[bold red]获取多维表格应用失败: {e}[/bold red]")
 
 @app.command()
-def main():
+def run_sync_job():
     # 初始化飞书助手
     feishu_helper = FeishuBitableHelper()
     
@@ -87,5 +89,25 @@ def main():
     if filled_count > 0:
         update_filled_records_to_feishu(filled_records, feishu_helper)
 
+
+@app.command()
+def schedule_daily(hour: int = typer.Option(18, help="每天执行的小时（24小时制）"), minute: int = typer.Option(0, help="每天执行的分钟")):
+    """
+    每天定时执行一次数据同步，默认每天 18:00 执行
+    """
+    console.print(f"[bold green]定时任务启动，每天{hour:02d}:{minute:02d}执行一次...[/bold green]")
+    while True:
+        now = datetime.now()
+        next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if now >= next_run:
+            # 已过今天执行时间，则定到明天
+            next_run += timedelta(days=1)
+        sleep_seconds = (next_run - now).total_seconds()
+        console.print(f"距离下次执行还有 {int(sleep_seconds)} 秒，预计下次执行时间: {next_run}")
+        time.sleep(sleep_seconds)
+        try:
+            run_sync_job()
+        except Exception as e:
+            console.print(f"[bold red]定时任务执行失败: {e}[/bold red]")
 if __name__ == "__main__":
     app()
