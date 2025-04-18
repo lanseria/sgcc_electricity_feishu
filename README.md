@@ -54,6 +54,8 @@ pytest
 ```bash
 cp .env.example .env.prod
 docker build -t sgcc_electricity_feishu:latest .
+# 国内 
+# docker build -t sgcc_electricity_feishu:latest -f Dockerfile.local .
 docker compose up -d
 ```
 
