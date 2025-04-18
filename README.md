@@ -73,7 +73,11 @@ pyproject.toml     # Project configuration
 
 飞书多维表格模板：[点击访问](https://enjqkboeqf.feishu.cn/base/O94YbicNVapkVdsuzgIcojx3nWh?from=from_copylink)
 
-验证码识别模型 captcha.onnx：请从 https://github.com/ARC-MX/sgcc_electricity_new 下载
+验证码识别模型 captcha.onnx：请从 https://github.com/ARC-MX/sgcc_electricity_new 下载  
+或使用以下命令直接下载：
+```bash
+curl -L -o captcha.onnx "https://github.com/ARC-MX/sgcc_electricity_new/raw/refs/heads/master/scripts/captcha.onnx"
+```
 
 讲解视频：（待补充）
 
