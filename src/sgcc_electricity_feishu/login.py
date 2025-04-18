@@ -49,8 +49,8 @@ class LoginHelper:
         load_dotenv(verbose=True)
         self.chromedriver_path = os.getenv("CHROMEDRIVER_PATH")
         if not self.chromedriver_path:
-            logging.error("请在 .env 文件中设置 CHROMEDRIVER_PATH")
-            raise ValueError("未设置chromedriver路径")
+            self.chromedriver_path = "/usr/bin/chromedriver"
+            logging.warning("使用默认位置，如开发，请在 .env 文件中设置 CHROMEDRIVER_PATH")
         self.username = os.getenv("USERNAME")
         self.password = os.getenv("PASSWORD")
         if not self.username or not self.password:
@@ -202,7 +202,7 @@ class LoginHelper:
         chrome_options = webdriver.ChromeOptions()
         # 根据需要取消注释下一行以启用无头模式
         # if os.getenv("DEBUG_MODE", "false").lower() != "true":
-        #     chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--headless')
         chrome_options.add_argument('--incognito')
         chrome_options.add_argument('--window-size=1200,800')
         chrome_options.add_argument('--no-sandbox')

@@ -38,6 +38,7 @@ tiles/
 output_videos/
 combined_output.png
 .env
+.env.prod
 captcha.onnx
 login_info.json
 sgcc_cache/

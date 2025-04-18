@@ -1,0 +1,12 @@
+services:
+  sgcc_electricity_feishu:
+    env_file:
+      - .env.prod
+    image: sgcc_electricity_feishu:latest
+    container_name: sgcc_electricity_feishu
+    network_mode: "host"
+    environment:
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai
+    restart: unless-stopped
+    init: true
