@@ -49,6 +49,14 @@ Run tests:
 pytest
 ```
 
+## Deployment
+
+```bash
+cp .env.example .env.prod
+docker build -t sgcc_electricity_feishu:latest .
+docker compose up -d
+```
+
 ## Project Structure
 
 ```
