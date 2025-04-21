@@ -40,6 +40,7 @@ pip install -e .
 
 ```bash
 sef run-sync-job
+sef schedule-daily
 ```
 
 ## Development
