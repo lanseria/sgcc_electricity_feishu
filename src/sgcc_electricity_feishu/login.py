@@ -112,9 +112,6 @@ class LoginHelper:
                 logging.warning(f"获取sessionStorage失败: {e}")
                 login_info["sessionStorage"] = {}
             
-            # 打印 JSON 数据
-            print("即将保存的登录信息（JSON 格式）:", json.dumps(login_info, indent=4))
-            
             with open(LOGIN_INFO_FILE, "w") as f:
                 json.dump(login_info, f, indent=4)
         except Exception as e:

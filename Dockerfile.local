@@ -16,16 +16,20 @@ COPY ./pyproject.toml ./
 COPY ./captcha.onnx ./
 COPY ./README.md ./
 
-# 设置清华镜像源
-RUN echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list \
-    && echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list \
-    && echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware" >> /etc/apt/sources.list \
-    && echo "deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list
+# 设置 apt 使用清华镜像源（适用于 Debian Bookworm）
+# 使用 DEB822 格式（不修改镜像源，保持默认官方源）
+RUN echo "Types: deb" > /etc/apt/sources.list.d/debian.sources && \
+    echo "URIs: http://mirrors.tuna.tsinghua.edu.cn/debian" >> /etc/apt/sources.list.d/debian.sources && \
+    echo "Suites: bookworm bookworm-updates bookworm-backports" >> /etc/apt/sources.list.d/debian.sources && \
+    echo "Components: main" >> /etc/apt/sources.list.d/debian.sources
 
-# 仅安装必要软件
+# 安装必要软件（包括 tzdata）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
+    tzdata \
+    && ln -fs /usr/share/zoneinfo/${TZ} /etc/localtime \
+    && dpkg-reconfigure -f noninteractive tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # 使用清华源安装Python依赖
