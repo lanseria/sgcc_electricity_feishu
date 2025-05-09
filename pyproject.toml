@@ -33,14 +33,7 @@ dependencies = [
   "onnxruntime>=1.21.0",
   "numpy>=2.2.4",
   "lark-oapi>=1.4.13",
-]
-
-[project.optional-dependencies]
-test = [
   "pytest>=7.0.0",
-]
-build = [
-  "pyinstaller>=6.3.0",
 ]
 
 [project.scripts]
