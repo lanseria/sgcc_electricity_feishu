@@ -93,11 +93,9 @@ class ElectricityDataFetcher:
                     return false;
                     """
                     self.driver.execute_script(js_click_user_menu)
-                    time.sleep(1)  # 等待用户切换
-
-
+                    time.sleep(3)  # 等待用户切换
                     # 点击"日用电量"按钮
-                    self._click_button(self.driver, By.XPATH, '//div[contains(text(), "日用电量")]')
+                    self._click_button(self.driver, By.XPATH, '//*[@id="tab-second"]')
                     time.sleep(3)  # 等待数据加载
 
                     # 执行JS脚本获取数据
