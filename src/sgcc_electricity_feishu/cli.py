@@ -79,7 +79,7 @@ def run_sync_job():
     
     # 获取国家电网数据(带缓存)
     sgcc_data = get_sgcc_data_with_cache()
-
+    
     # 填补缺失数据
     filled_records, filled_count = fill_missing_data(feishu_response.items, sgcc_data)
     
