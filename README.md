@@ -27,13 +27,10 @@ cp .env.example .env
 
 ```bash
 # 创建虚拟环境
-python3 -m venv myenv
-python3.12 -m venv myenv
-source myenv/bin/activate  # macOS/Linux
-# .\myenv\Scripts\Activate.ps1  # Windows
+uv venv
 
 # 安装依赖
-pip install -e .
+uv sync
 ```
 
 ## Usage
