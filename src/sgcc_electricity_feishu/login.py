@@ -197,16 +197,20 @@ class LoginHelper:
     def _init_driver(self):
         """初始化浏览器驱动"""
         chrome_options = webdriver.ChromeOptions()
-        # 根据需要取消注释下一行以启用无头模式
-        # if os.getenv("DEBUG_MODE", "false").lower() != "true":
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--incognito')
-        chrome_options.add_argument('--window-size=1200,800')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--disable-dev-shm-usage')
+        # chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--start-maximized")
 
-        # 指定chromedriver路径 (根据用户之前的反馈)
+        # 反爬虫检测
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_argument(
+            'user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+
         chromedriver_path = self.chromedriver_path
         service = Service(executable_path=chromedriver_path)
 
@@ -251,96 +255,120 @@ class LoginHelper:
             logging.error(f"输入文本失败: {by}={value}, 错误: {str(e)}")
             raise
 
-    # --- Sliding track method from DataFetcher example ---
     def _sliding_track(self, distance):
-        """Simulates human-like sliding track."""
+        """模拟人类滑动轨迹：加速 → 匀速 → 减速 → 微回弹"""
         try:
-            # 等待滑块元素出现
             slider = WebDriverWait(self.driver, self.retry_wait_time).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "slide-verify-slider-mask-item"))
             )
             logging.info(f"找到滑块元素，准备滑动距离: {distance}")
             ActionChains(self.driver).click_and_hold(slider).perform()
-            time.sleep(0.2) # 短暂按住
 
-            # 模拟非匀速滑动轨迹 (简化版，可以根据需要细化)
-            current_offset = 0
-            while current_offset < distance:
-                move = random.randint(10, 25) # 每次移动一小段随机距离
-                if current_offset + move > distance:
-                    move = distance - current_offset
-                
-                yoffset_random = random.uniform(-2, 3) # Y轴轻微随机抖动
-                ActionChains(self.driver).move_by_offset(xoffset=move, yoffset=yoffset_random).perform()
-                current_offset += move
-                time.sleep(random.uniform(0.01, 0.05)) # 模拟停顿
+            moved = 0
+            accel_end = distance * 0.4
+            cruise_end = distance * 0.8
 
-            # 微调，确保到达目标位置
-            remaining = distance - current_offset
-            if remaining > 0:
-                ActionChains(self.driver).move_by_offset(xoffset=remaining, yoffset=random.uniform(-1, 1)).perform()
-            
-            time.sleep(0.3 + random.uniform(0, 0.2)) # 滑动后稍作停顿
+            while moved < distance:
+                remaining = distance - moved
+                if moved < accel_end:
+                    step = random.randint(8, 16)
+                    delay = random.uniform(0.005, 0.02)
+                elif moved < cruise_end:
+                    step = random.randint(4, 10)
+                    delay = random.uniform(0.01, 0.03)
+                else:
+                    step = random.randint(1, 4)
+                    delay = random.uniform(0.02, 0.06)
+
+                step = min(step, remaining)
+                y_jitter = random.uniform(-1, 1)
+                ActionChains(self.driver).move_by_offset(xoffset=step, yoffset=y_jitter).perform()
+                moved += step
+                time.sleep(delay)
+
+            # 微回弹，模拟真实滑动后的松手
+            rebound = random.randint(1, 3)
+            ActionChains(self.driver).move_by_offset(xoffset=-rebound, yoffset=0).perform()
+            time.sleep(random.uniform(0.05, 0.15))
             ActionChains(self.driver).release().perform()
             logging.info("滑块释放")
             return True
         except Exception as e:
             logging.error(f"滑动验证码失败: {e}")
             return False
-    # --- End Sliding track method ---
 
     def _handle_captcha(self):
-        """Handles the sliding CAPTCHA."""
+        """处理滑块验证码，使用 ONNX 模型识别缺口并计算正确的滑动距离"""
         if not self.onnx:
             logging.error("ONNX模型未加载，无法处理验证码。")
             return False
 
         try:
-            # 等待验证码画布出现 (使用ID，更稳定)
             WebDriverWait(self.driver, self.retry_wait_time).until(
                 EC.presence_of_element_located((By.ID, "slideVerify"))
             )
             logging.info("检测到滑块验证码容器")
-            time.sleep(1) # 等待图片加载
+            time.sleep(1)
 
-            # 获取背景图片 base64 (参考示例)
-            # 注意：JS路径可能需要根据实际页面调整
+            # 获取背景图片
             background_JS = 'return document.getElementById("slideVerify").childNodes[0].toDataURL("image/png");'
             im_info = self.driver.execute_script(background_JS)
             if not im_info or 'base64' not in im_info:
                 logging.error("获取验证码背景图Base64失败")
                 return False
 
-            background_image = base64_to_PLI(im_info)
+            background = im_info.split(',')[1]
+            background_image = base64_to_PLI(background)
             if background_image is None:
                 logging.error("转换验证码背景图失败")
                 return False
-            logging.info("成功获取并转换验证码背景图")
+            logging.info("成功获取验证码背景图")
 
             # 使用 ONNX 模型计算距离
             distance = self.onnx.get_distance(background_image)
             if distance == 0:
-                logging.warning("ONNX模型未能检测到缺口或距离为0")
-                # 可以选择重试或放弃
-                return False # 距离为0通常意味着识别失败
+                logging.warning("ONNX模型未能检测到缺口")
+                return False
 
-            logging.info(f"ONNX模型计算出的滑动距离: {distance}")
+            # ONNX 模型在 416x416 空间检测，缩放到实际画布宽度
+            canvas_width = self.driver.execute_script(
+                'return document.getElementById("slideVerify").childNodes[0].width;'
+            )
+            scale = canvas_width / 416.0
+            img_distance = distance * scale
 
-            # 执行滑动操作 (参考示例，补偿系数可调)
-            # 补偿系数可能需要根据实际测试调整
-            compensation_factor = float(os.getenv("SLIDER_COMPENSATION_FACTOR", 1.06)) 
-            actual_distance = round(distance * compensation_factor)
-            logging.info(f"应用补偿系数 {compensation_factor} 后，实际滑动距离: {actual_distance}")
-            
-            if not self._sliding_track(actual_distance):
-                return False # 滑动操作本身失败
+            # 滑块滑动和图片空缺的移动不一致
+            max_sliding = 410 - 40  # 滑块最多可以滑动的距离
+            img_max_sliding = 418 - 68  # 图片最多可以滑动的距离
+            sliding_scale = max_sliding / img_max_sliding
+            scaled_distance = round(img_distance * sliding_scale)
 
-            time.sleep(self.retry_wait_time / 2) # 滑动后等待验证结果
+            logging.info(
+                f"验证码距离: distance={distance}, img_distance={img_distance:.3f}, "
+                f"canvas_width={canvas_width}, scale={scale:.3f}, "
+                f"sliding_scale={sliding_scale:.3f}, scaled={scaled_distance}"
+            )
+
+            if not self._sliding_track(scaled_distance):
+                return False
+
+            time.sleep(self.retry_wait_time / 2)
             return True
 
         except Exception as e:
             logging.error(f"处理验证码过程中出错: {e}")
             return False
+
+    def _get_error_message(self):
+        """获取页面错误信息"""
+        self.driver.implicitly_wait(0)
+        try:
+            element = self.driver.find_element(By.XPATH, "//div[@class='errmsg-tip']//span")
+            return element.text
+        except Exception:
+            return None
+        finally:
+            self.driver.implicitly_wait(self.driver_wait_time)
 
     def login(self):
         """执行登录操作，包含验证码处理"""
@@ -351,110 +379,92 @@ class LoginHelper:
         try:
             self.driver.get(LOGIN_URL)
             logging.info(f"访问登录页面: {LOGIN_URL}")
-            time.sleep(self.retry_wait_time / 2)
 
-            logging.info("查找并点击 'user' 切换按钮")
-            self._click_element(By.CLASS_NAME, "user")
-            logging.info("查找并点击切换到密码登录的 span")
+            # 等待页面加载
+            try:
+                WebDriverWait(self.driver, self.driver_wait_time * 3).until(
+                    EC.visibility_of_element_located((By.CLASS_NAME, "user")))
+            except Exception:
+                logging.debug("登录页面加载超时")
+
+            time.sleep(self.retry_wait_time)
+
+            # 等待加载遮罩消失
+            self.driver.implicitly_wait(0)
+            try:
+                WebDriverWait(self.driver, 10).until(
+                    EC.invisibility_of_element_located((By.CLASS_NAME, 'el-loading-mask')))
+            finally:
+                self.driver.implicitly_wait(self.driver_wait_time)
+
+            # 切换到用户名密码登录
+            element = WebDriverWait(self.driver, self.driver_wait_time).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'user')))
+            self.driver.execute_script("arguments[0].click();", element)
+            logging.info("切换到用户名密码登录")
+
             self._click_element(By.XPATH, '//*[@id="login_box"]/div[1]/div[1]/div[2]/span')
-            time.sleep(self.retry_wait_time / 5)
+            time.sleep(self.retry_wait_time)
 
-            logging.info("查找并点击同意选项")
+            # 点击同意按钮
             self._click_element(By.XPATH, '//*[@id="login_box"]/div[2]/div[1]/form/div[1]/div[3]/div/span[2]')
-            time.sleep(self.retry_wait_time / 5)
+            logging.info("点击同意按钮")
+            time.sleep(self.retry_wait_time)
 
-            # 移除 phone_code 相关逻辑块
-            # 用户名密码登录逻辑 (现在是默认且唯一的逻辑)
-            logging.info("用户名密码登录模式...")
-            logging.info("输入用户名...")
-            self._input_text(By.XPATH, '//input[@placeholder="请输入用户名/手机号/邮箱"]', self.username)
-            logging.info("输入密码...")
-            self._input_text(By.XPATH, '//input[@placeholder="请输入密码"]', self.password)
+            # 输入用户名和密码
+            input_elements = self.driver.find_elements(By.CLASS_NAME, "el-input__inner")
+            input_elements[0].send_keys(self.username)
+            logging.info(f"输入用户名: {self.username}")
+            input_elements[1].send_keys(self.password)
+            logging.info("输入密码")
 
-            logging.info("点击登录按钮...")
-            self._click_element(By.CLASS_NAME, "el-button--primary")
-            time.sleep(self.retry_wait_time / 2) # 等待验证码或跳转
+            # 点击登录按钮
+            self._click_element(By.CLASS_NAME, "el-button.el-button--primary")
+            time.sleep(self.retry_wait_time * 2)
+            logging.info("点击登录按钮")
 
-            # --- 验证码处理循环 ---
+            # 验证码处理循环
             for attempt in range(1, self.retry_limit + 1):
-                logging.info(f"检查是否需要验证码 (尝试次数: {attempt}/{self.retry_limit})")
-                
-                # 检查是否已登录成功 (URL变化)
-                current_url = self.driver.current_url
-                if LOGIN_URL not in current_url:
-                    logging.info("登录成功 (URL已改变)")
+                logging.info(f"验证码处理 (尝试 {attempt}/{self.retry_limit})")
+
+                # 检查是否已登录成功
+                if LOGIN_URL not in self.driver.current_url:
+                    logging.info("登录成功")
                     return True
 
-                # 检查是否出现验证码 (通过ID查找容器)
+                # 处理验证码
+                if not self._handle_captcha():
+                    logging.warning("验证码处理失败")
+                    try:
+                        self._click_element(By.CLASS_NAME, "el-button.el-button--primary")
+                        time.sleep(self.retry_wait_time * 2)
+                    except Exception:
+                        pass
+                    continue
+
+                time.sleep(self.retry_wait_time)
+
+                # 检查是否登录成功
+                if LOGIN_URL not in self.driver.current_url:
+                    logging.info("验证码验证成功，登录完成")
+                    return True
+
+                # 获取错误信息
+                error_msg = self._get_error_message()
+                if error_msg:
+                    logging.info(f"滑块验证失败 [{error_msg}]，重新尝试")
+                else:
+                    logging.info("滑块验证失败，重新尝试")
+
+                # 重新点击登录按钮触发新验证码
                 try:
-                    captcha_container = self.driver.find_element(By.ID, "slideVerify")
-                    if captcha_container.is_displayed():
-                        logging.info("检测到滑块验证码，开始处理...")
-                        if self._handle_captcha():
-                            # 处理成功后，再次检查登录状态
-                            time.sleep(self.retry_wait_time / 2)
-                            current_url = self.driver.current_url
-                            if LOGIN_URL not in current_url:
-                                logging.info("验证码处理后登录成功 (URL已改变)")
-                                return True
-                            else:
-                                    logging.warning("验证码处理后URL未改变，可能验证失败，继续重试...")
-                                    # 可能需要刷新验证码或重新点击登录按钮
-                                    try:
-                                        # 尝试刷新验证码（如果页面提供刷新按钮）
-                                        refresh_button = self.driver.find_element(By.XPATH, "//*[contains(@class, 'refresh') or contains(@class, 'reload')]") # 假设的刷新按钮选择器
-                                        if refresh_button.is_displayed():
-                                            self._click_element(By.XPATH, "//*[contains(@class, 'refresh') or contains(@class, 'reload')]")
-                                            logging.info("尝试刷新验证码")
-                                            time.sleep(1)
-                                        else:
-                                            # 如果没有刷新按钮，可能需要重新点击登录触发新的验证码
-                                            logging.info("未找到刷新按钮，尝试重新点击登录按钮触发新验证码")
-                                            self._click_element(By.CLASS_NAME, "el-button--primary")
-                                            time.sleep(self.retry_wait_time / 2)
+                    self._click_element(By.CLASS_NAME, "el-button.el-button--primary")
+                    time.sleep(self.retry_wait_time * 2)
+                except Exception:
+                    pass
 
-                                    except:
-                                        logging.warning("刷新验证码或重新点击登录失败，继续等待或下次重试")
-                                        time.sleep(self.retry_wait_time) # 等待一段时间再试
-
-                        else:
-                            logging.error("验证码处理失败，继续重试...")
-                            # 处理失败后也可能需要刷新或重新点击登录
-                            try:
-                                    refresh_button = self.driver.find_element(By.XPATH, "//*[contains(@class, 'refresh') or contains(@class, 'reload')]")
-                                    if refresh_button.is_displayed():
-                                        self._click_element(By.XPATH, "//*[contains(@class, 'refresh') or contains(@class, 'reload')]")
-                                        logging.info("尝试刷新验证码")
-                                        time.sleep(1)
-                                    else:
-                                        logging.info("未找到刷新按钮，尝试重新点击登录按钮触发新验证码")
-                                        self._click_element(By.CLASS_NAME, "el-button--primary")
-                                        time.sleep(self.retry_wait_time / 2)
-                            except:
-                                    logging.warning("刷新验证码或重新点击登录失败，继续等待或下次重试")
-                                    time.sleep(self.retry_wait_time)
-
-                    else:
-                        # 没有验证码，但URL没变，可能是其他错误
-                        logging.warning("未检测到验证码，但登录URL未改变，等待重试...")
-                        time.sleep(self.retry_wait_time)
-
-                except Exception as find_captcha_e:
-                    # 没找到验证码容器，可能已登录或页面结构变化
-                    logging.info(f"未找到验证码容器 (可能已登录或页面结构变化): {find_captcha_e}")
-                    # 再次检查URL
-                    current_url = self.driver.current_url
-                    if LOGIN_URL not in current_url:
-                        logging.info("登录成功 (URL已改变)")
-                        return True
-                    else:
-                        logging.warning("未找到验证码且URL未变，等待重试...")
-                        time.sleep(self.retry_wait_time)
-
-            # 如果循环结束仍未成功
             logging.error(f"尝试 {self.retry_limit} 次后登录仍失败")
             return False
-            # 移除 phone_code 相关的检查块
 
         except Exception as e:
             logging.error(f"登录过程中发生严重错误: {str(e)}")

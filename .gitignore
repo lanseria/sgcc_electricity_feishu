@@ -1,4 +1,4 @@
-myenv/
+.venv/
 input/
 __pycache__/
 .DS_Store
@@ -42,3 +42,4 @@ combined_output.png
 captcha.onnx
 login_info.json
 sgcc_cache/
+.claude
